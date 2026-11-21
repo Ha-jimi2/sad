@@ -1,0 +1,24 @@
+# ---- CLion / IDE ----
+.idea/
+cmake-build-*/
+*.iml
+
+# ---- 构建产物 ----
+*.elf
+*.hex
+*.bin
+*.map
+*.o
+*.obj
+*.d
+build/
+cmake-build-*/
+
+# ---- CubeMX 备份 ----
+*.ioc.bak
+*.mxproject.bak
+
+# ---- 系统文件 ----
+Thumbs.db
+.DS_Store
+desktop.ini
