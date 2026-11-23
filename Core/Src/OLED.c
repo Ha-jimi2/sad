@@ -61,6 +61,7 @@ void OLED_I2C_SendByte(uint8_t Byte)
 		OLED_W_SCL(1);
 		OLED_W_SCL(0);
 	}
+	OLED_W_SDA(1);
 	OLED_W_SCL(1);	//额外的一个时钟，不处理应答信号
 	OLED_W_SCL(0);
 }

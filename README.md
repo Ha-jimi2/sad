@@ -71,10 +71,10 @@ while (1)
     }
 
 ```
-### 串口反馈格式
+## 串口反馈格式
 ```
 STATE=RUN,DIR=FWD,STEP=300,LED=1
-```  
+```
 | 字段 | 取值 | 说明 |
 |---|---|---|
 | `STATE` | `RUN` / `PAUSE` | 运行 / 暂停 |
@@ -338,7 +338,7 @@ static void Proto_Apply(const uint8_t* p)
 [OLED_Font.h](./Core/Inc/OLED_Font.h)  
 文件来源：26电控组招新-群文件-第三次培训所用资料.zip    
 更改了引脚配置
-#### 实现原理
+#### main.c
 定义流水灯改变前的状态，初始化状态
 ```c
 typedef struct
@@ -395,22 +395,124 @@ static void Ui_Refresh(void)
     OLED_ShowString(4, 7, buf);
 }
 ```
+#### OLED.c
+定义两个宏，便于改变SCL和SDA的电平
+```c
+#define OLED_W_SCL(x)		HAL_GPIO_WritePin(OLED_SCL_GPIO_Port, OLED_SCL_Pin, (GPIO_PinState)(x))
+#define OLED_W_SDA(x)		HAL_GPIO_WritePin(OLED_SDA_GPIO_Port, OLED_SDA_Pin, (GPIO_PinState)(x))
+```
+START条件：SCL高电平时SDA由高变低
+```c
+void OLED_I2C_Start(void)
+{
+	OLED_W_SDA(1);
+	OLED_W_SCL(1);
+	OLED_W_SDA(0);
+	OLED_W_SCL(0);
+}
+```
+STOP条件：SCL高电平时SDA由低变高
+```c
+void OLED_I2C_Stop(void)
+{
+	OLED_W_SDA(0);
+	OLED_W_SCL(1);
+	OLED_W_SDA(1);
+}
+
+```
+定义发送函数`OLED_I2C_SendByte`，在SCL低电平时改变SDA的电平以发送字节，然后拉高SCL让OLED读取字节，发送结束后释放SDA、拉高SCL，OLED主动拉低SDA表示收到（ACK），检查ACK的代码没写
+```c
+void OLED_I2C_SendByte(uint8_t Byte)
+{
+	uint8_t i;
+	for (i = 0; i < 8; i++)
+	{
+		OLED_W_SDA(Byte & (0x80 >> i));
+		OLED_W_SCL(1);
+		OLED_W_SCL(0);
+	}
+    OLED_W_SDA(1);
+	OLED_W_SCL(1);
+	OLED_W_SCL(0);
+}
+```
+定义2个函数，分别用于写入命令和写入数据，控制字节`0x00`表示后面是命令，控制字节`0x40`表示后面是数据
+```c
+/**
+  * @brief  OLED写命令
+  * @param  Command 要写入的命令
+  * @retval 无
+  */
+void OLED_WriteCommand(uint8_t Command)
+{
+	OLED_I2C_Start();
+	OLED_I2C_SendByte(0x78);		//从机地址
+	OLED_I2C_SendByte(0x00);		//写命令
+	OLED_I2C_SendByte(Command); 
+	OLED_I2C_Stop();
+}
+
+/**
+  * @brief  OLED写数据
+  * @param  Data 要写入的数据
+  * @retval 无
+  */
+void OLED_WriteData(uint8_t Data)
+{
+	OLED_I2C_Start();
+	OLED_I2C_SendByte(0x78);		//从机地址
+	OLED_I2C_SendByte(0x40);		//写数据
+	OLED_I2C_SendByte(Data);
+	OLED_I2C_Stop();
+}
+```
+定义定位函数`OLED_SetCursor`，确定光标位置，将坐标转化为命令，发给OLED  
+Y 是页地址（0~7），每页 8 行像素；X 是列地址（0~127）。列地址是 7 位而命令只能带 4 位参数，所以拆成高 4 位、低 4 位两次发送
+```c
+void OLED_SetCursor(uint8_t Y, uint8_t X)
+{
+	OLED_WriteCommand(0xB0 | Y);
+	OLED_WriteCommand(0x10 | ((X & 0xF0) >> 4));
+	OLED_WriteCommand(0x00 | (X & 0x0F));
+}
+```
+定义绘制函数`OLED_ShowChar`，算出绘制的位置，调用定位函数`OLED_SetCursor`发给OLED，再把绘制的字符拆成数据，调用`OLED_WriteData`发给OLED  
+8×16 字体占 16 行，而显存一页只有 8 行，所以一个字符跨 2 页，需要两次定位；Char - ' ' 把 ASCII 码转成字库下标
+```c
+void OLED_ShowChar(uint8_t Line, uint8_t Column, char Char)
+{      	
+	uint8_t i;
+	OLED_SetCursor((Line - 1) * 2, (Column - 1) * 8);
+	for (i = 0; i < 8; i++)
+	{
+		OLED_WriteData(OLED_F8x16[Char - ' '][i]);
+	}
+	OLED_SetCursor((Line - 1) * 2 + 1, (Column - 1) * 8);
+	for (i = 0; i < 8; i++)
+	{
+		OLED_WriteData(OLED_F8x16[Char - ' '][i + 8]);
+	}
+}
+```
+定义函数`OLED_ShowString`用于把单词拆成字符，再调用绘制函数`OLED_ShowChar`
+```c
+void OLED_ShowString(uint8_t Line, uint8_t Column, char *String)
+{
+	uint8_t i;
+	for (i = 0; String[i] != '\0'; i++)
+	{
+		OLED_ShowChar(Line, Column + i, String[i]);
+	}
+}
+```
 ### 选做
 之后补上
+
 ## 4 通过串口中断发送反馈
 | 功能 | 引脚 | 模式 | 备注 |
 |---|---|---|---|
 | USART1 TX | PA9 | 复用推挽 | 115200 |
-### 串口反馈格式
-```
-STATE=RUN,DIR=FWD,STEP=300,LED=1
-```  
-| 字段 | 取值 | 说明 |
-|---|---|---|
-| `STATE` | `RUN` / `PAUSE` | 运行 / 暂停 |
-| `DIR` | `FWD` / `REV` | 正向 / 反向 |
-| `STEP` | 100~2000 | 切换间隔（ms） |
-| `LED` | 1 / 2 / 3 | 当前点亮的灯号 |
 ### 必做
 定义缓冲区，初始化串口状态
 ```c
