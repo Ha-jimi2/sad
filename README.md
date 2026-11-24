@@ -1,6 +1,8 @@
 # 电控组第三次培训作业
 - **贾政**
 - ***20263001720***
+> 仓库根目录为**必做版**（软件 I²C 驱动 OLED + 串口中断反馈）  
+> `LED_QUEEN/` 子目录为**选做版**（硬件 I²C 驱动 OLED + DMA 发送反馈）
 ## 程序要求
 全工程只有一份运行状态`g_run`，按键、串口、OLED、串口反馈都读写这一份数据，因此显示与实际状态不会出现不一致。
 ```c
@@ -507,8 +509,33 @@ void OLED_ShowString(uint8_t Line, uint8_t Column, char *String)
 }
 ```
 ### 选做
-之后补上
-
+| 功能 | 引脚 | 模式 | 备注 |
+|---|---|---|---|
+| OLED SCL | PB6 | 复用开漏（I2C1_SCL） | 硬件 I²C，Fast Mode 400 kHz |
+| OLED SDA | PB7 | 复用开漏（I2C1_SDA） | 同上 |
+#### main.c
+同必做
+#### OLED.c
+定义OLED地址
+```c
+#define OLED_ADDR  0x78
+```
+定义发送函数`OLED_HW_Write`，定义一个缓冲区`tmp`，将控制字节`ctrl`和要发送的字节先后填入缓冲区，然后调用`HAL_I2C_Master_Transmit`发送给OLED
+```c
+static void OLED_HW_Write(uint8_t ctrl, const uint8_t* p, uint16_t len)
+{
+	static uint8_t tmp[1 + 128];
+	if (len > 128) return;
+	tmp[0] = ctrl;
+	for (uint16_t i = 0; i < len; i++) tmp[1 + i] = p[i];
+	HAL_I2C_Master_Transmit(&hi2c1, OLED_ADDR, tmp, (uint16_t)(len + 1), 100);
+}
+```
+发送命令改为调用发送函数`OLED_HW_Write`发送
+```c
+void OLED_WriteCommand(uint8_t Command) { OLED_HW_Write(0x00, &Command, 1); }
+```
+数据改为由发送函数`OLED_HW_Write`批量发送
 ## 4 通过串口中断发送反馈
 | 功能 | 引脚 | 模式 | 备注 |
 |---|---|---|---|
@@ -561,5 +588,36 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef* huart)
 }
 ```
 ### 选做
-之后补上
+| 功能 | 引脚 | 模式 | 备注 |
+|---|---|---|---|
+| USART1 TX | PA9 | 复用推挽 | 115200，由DMA搬运 |  
+
+| 功能 | 外设 / 通道 | 方向 | 模式 / 备注 |
+|---|---|---|---|
+| 反馈发送 | USART1_TX → **DMA1 Channel4** | Memory → Peripheral | Normal，Byte，Priority Low |
+| 中断 | `USART1 global interrupt` | Enabled | 提示发送完成 |
+| 中断 | `DMA1 Channel4 interrupt` | Enabled | DMA 传输完成 |
+更改发送函数`Feedback_Poll`，改为通过`HAL_UART_Transmit_DMA`发送反馈
+```c
+static void Feedback_Poll(void)
+{
+    int n;
+
+    if (!g_tx_pending || g_tx_busy) return;
+    g_tx_pending = 0;
+
+    n = snprintf(g_tx_buf, sizeof g_tx_buf,
+                 "STATE=%s,DIR=%s,STEP=%u,LED=%u\r\n",
+                 g_run.running ? "RUN" : "PAUSE",
+                 g_run.dir ? "REV" : "FWD",
+                 (unsigned)g_run.step_ms,
+                 (unsigned)g_run.led);
+
+    if (n <= 0 || n >= (int)sizeof g_tx_buf) return;
+
+    g_tx_busy = 1;
+    if (HAL_UART_Transmit_DMA(&huart1, (const uint8_t*)g_tx_buf, (uint16_t)n) != HAL_OK)
+        g_tx_busy = 0;
+}
+```
 
