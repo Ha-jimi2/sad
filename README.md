@@ -1,7 +1,7 @@
 # 电控组第三次培训作业
 - **贾政**
 - ***20263001720***
-> 仓库根目录为**必做版**（软件 I²C 驱动 OLED + 串口中断反馈）  
+> `LED_KING/` 子目录为**必做版**（软件 I²C 驱动 OLED + 串口中断反馈）  
 > `LED_QUEEN/` 子目录为**选做版**（硬件 I²C 驱动 OLED + DMA 发送反馈）
 ## 程序要求
 全工程只有一份运行状态`g_run`，按键、串口、OLED、串口反馈都读写这一份数据，因此显示与实际状态不会出现不一致。
@@ -335,9 +335,9 @@ static void Proto_Apply(const uint8_t* p)
 |---|---|---|---|
 | OLED SCL / SDA | PB6 / PB7 | 开漏输出 | 软件 I²C |  
 
-[OLED.c](./Core/Src/OLED.c)  
-[OLED.h](./Core/Inc/OLED.h)  
-[OLED_Font.h](./Core/Inc/OLED_Font.h)  
+[OLED.c](LED_KING/Core/Src/OLED.c)  
+[OLED.h](LED_KING/Core/Inc/OLED.h)  
+[OLED_Font.h](LED_KING/Core/Inc/OLED_Font.h)  
 文件来源：26电控组招新-群文件-第三次培训所用资料.zip    
 更改了引脚配置
 #### main.c

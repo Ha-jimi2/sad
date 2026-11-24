@@ -243,7 +243,7 @@ typedef struct
   */ 
 
 /* Include FLASH HAL Extended module */
-#include "stm32f1xx_hal_flash_ex.h"  
+#include "stm32f1xx_hal_flash_ex.h"
 
 /* Exported functions --------------------------------------------------------*/
 /** @addtogroup FLASH_Exported_Functions
