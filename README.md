@@ -597,6 +597,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef* huart)
 | 反馈发送 | USART1_TX → **DMA1 Channel4** | Memory → Peripheral | Normal，Byte，Priority Low |
 | 中断 | `USART1 global interrupt` | Enabled | 提示发送完成 |
 | 中断 | `DMA1 Channel4 interrupt` | Enabled | DMA 传输完成 |
+
 更改发送函数`Feedback_Poll`，改为通过`HAL_UART_Transmit_DMA`发送反馈
 ```c
 static void Feedback_Poll(void)
